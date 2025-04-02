@@ -5,6 +5,11 @@ from google.oauth2 import service_account
 from google.analytics.data_v1beta import BetaAnalyticsDataClient
 from google.analytics.data_v1beta.types import RunReportRequest, DateRange, Dimension, Metric
 
+
+if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
+    st.error("Please login to access this page.")
+    st.stop()
+    
 class GA4LandingPageAnalytics:
     def __init__(self, property_id, credentials):
         """
@@ -148,7 +153,7 @@ def main():
             credentials = service_account.Credentials.from_service_account_info(json_key)
             
             # Property ID input
-            property_id = st.sidebar.text_input("Enter GA4 Property ID", key="property_id")
+            property_id = 284938146
             
             if property_id:
                 # Date range selection
