@@ -11,6 +11,10 @@ import os
 import json
 from dotenv import load_dotenv
 
+if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
+    st.error("Please login to access this page.")
+    st.stop()
+    
 # Load environment variables
 load_dotenv()
 
@@ -56,7 +60,7 @@ with st.sidebar:
         st.error("YouTube Channel ID not found in environment variables")
         channel_id = st.text_input("YouTube Channel ID (Fallback)")
     
-    fetch_data = st.button("Fetch YouTube Data")
+    # Removed the fetch button
     
     st.markdown("---")
     
@@ -313,12 +317,33 @@ def generate_sample_data(content_type, num_rows=10):
     
     return pd.DataFrame(data)
 
-# Initialize session state for data if not exists
-if 'video_data' not in st.session_state:
-    st.session_state.video_data = generate_sample_data("Video")
+# Initialize session state for data loading status
+if 'data_loaded' not in st.session_state:
+    st.session_state.data_loaded = False
 
-if 'shorts_data' not in st.session_state:
-    st.session_state.shorts_data = generate_sample_data("Short")
+# Auto-fetch data on page load
+if not st.session_state.data_loaded:
+    if api_key and channel_id:
+        with st.spinner("Fetching data from YouTube API..."):
+            videos_df, shorts_df = fetch_youtube_data(api_key, channel_id)
+            
+            if videos_df is not None and shorts_df is not None:
+                st.session_state.video_data = videos_df
+                st.session_state.shorts_data = shorts_df
+                st.session_state.data_loaded = True
+                st.success("Data fetched successfully from YouTube API!")
+            else:
+                # Fall back to sample data if API fetch fails
+                st.session_state.video_data = generate_sample_data("Video")
+                st.session_state.shorts_data = generate_sample_data("Short")
+                st.session_state.data_loaded = True
+                st.warning("Using sample data instead. Please check your API credentials.")
+    else:
+        # Use sample data if API credentials are missing
+        st.session_state.video_data = generate_sample_data("Video")
+        st.session_state.shorts_data = generate_sample_data("Short")
+        st.session_state.data_loaded = True
+        st.info("Using sample data. For real data, provide YouTube API credentials.")
 
 # Define function to create metric explanation footer
 def display_metrics_footer():
@@ -338,16 +363,6 @@ def display_metrics_footer():
     
     st.markdown(metrics_explanation)
     st.caption("Note: Some metrics such as Watch Time, Reach, Impressions, and Shares are estimated based on available data.")
-
-# If API credentials are provided and fetch button is clicked, get real data
-if fetch_data and api_key and channel_id:
-    with st.spinner("Fetching data from YouTube API..."):
-        videos_df, shorts_df = fetch_youtube_data(api_key, channel_id)
-        
-        if videos_df is not None and shorts_df is not None:
-            st.session_state.video_data = videos_df
-            st.session_state.shorts_data = shorts_df
-            st.success("Data fetched successfully from YouTube API!")
 
 # Videos Tab
 with tab1:
@@ -436,7 +451,7 @@ with tab1:
         # Display metrics footer
         display_metrics_footer()
     else:
-        st.info("No video data available. Please fetch data from YouTube API.")
+        st.info("No video data available.")
 
 # Shorts Tab
 with tab2:
@@ -565,4 +580,21 @@ with tab2:
         # Display metrics footer
         display_metrics_footer()
     else:
-        st.info("No shorts data available. Please fetch data from YouTube API.")
+        st.info("No shorts data available.")
+
+# Add refresh button in the sidebar to manually refresh data if needed
+with st.sidebar:
+    st.subheader("Manual Data Refresh")
+    if st.button("Refresh Data"):
+        if api_key and channel_id:
+            with st.spinner("Refreshing data from YouTube API..."):
+                videos_df, shorts_df = fetch_youtube_data(api_key, channel_id)
+                
+                if videos_df is not None and shorts_df is not None:
+                    st.session_state.video_data = videos_df
+                    st.session_state.shorts_data = shorts_df
+                    st.success("Data refreshed successfully!")
+                else:
+                    st.error("Failed to refresh data. Using existing data.")
+        else:
+            st.warning("API credentials required for data refresh.")
